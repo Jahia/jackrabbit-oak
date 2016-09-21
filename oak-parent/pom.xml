@@ -74,6 +74,21 @@
     <surefire.skip.ut>false</surefire.skip.ut>
   </properties>
 
+  <distributionManagement>
+        <repository>
+            <id>jahia-releases</id>
+            <url>https://devtools.jahia.com/nexus/content/repositories/thirdparty-releases</url>
+        </repository>
+        <snapshotRepository>
+            <id>jahia-snapshots</id>
+            <url>https://devtools.jahia.com/nexus/content/repositories/thirdparty-snapshots</url>
+        </snapshotRepository>
+        <site>
+            <id>jahia.website</id>
+            <url>file://${jahia.site.path}</url>
+        </site>
+  </distributionManagement>
+
   <issueManagement>
     <system>Jira</system>
     <url>http://issues.apache.org/jira/browse/OAK</url>
