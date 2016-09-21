@@ -16,9 +16,7 @@
  */
 package org.apache.jackrabbit.oak.util;
 
-import java.util.Calendar;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
@@ -122,8 +120,8 @@ public final class TreeUtil {
      * @param tree         The target tree.
      * @param propertyName The name of the property.
      * @return the boolean representation of the property state with the given
-     *         name. This utility returns {@code false} if the property does not exist
-     *         or is an multivalued property.
+     * name. This utility returns {@code false} if the property does not exist
+     * or is an multivalued property.
      */
     public static boolean getBoolean(@Nonnull Tree tree, @Nonnull String propertyName) {
         PropertyState property = tree.getProperty(propertyName);
@@ -155,9 +153,9 @@ public final class TreeUtil {
      * the location of the start {@code tree} or {@code null} if {@code path} results
      * in a parent of the root.
      *
-     * @param tree  start tree
-     * @param path  path from the start tree
-     * @return  tree located at {@code path} from {@code start} or {@code null}
+     * @param tree start tree
+     * @param path path from the start tree
+     * @return tree located at {@code path} from {@code start} or {@code null}
      */
     @CheckForNull
     public static Tree getTree(@Nonnull Tree tree, @Nonnull String path) {
@@ -247,6 +245,19 @@ public final class TreeUtil {
 
     public static void autoCreateItems(@Nonnull Tree tree, @Nonnull Tree type, @Nonnull Tree typeRoot, @CheckForNull String userID)
             throws RepositoryException {
+
+        Map<String, AutoCreateHandler> propertiesHandler = new HashMap<String, AutoCreateHandler>();
+        Map<String, AutoCreateHandler> nodesHandler = new HashMap<String, AutoCreateHandler>();
+        ServiceLoader<AutoCreateHandler> loader = ServiceLoader.load(AutoCreateHandler.class, TreeUtil.class.getClassLoader());
+        for (AutoCreateHandler autoCreateHandler : loader) {
+            for (String name : autoCreateHandler.getProperties()) {
+                propertiesHandler.put(name, autoCreateHandler);
+            }
+            for (String name : autoCreateHandler.getNodes()) {
+                nodesHandler.put(name, autoCreateHandler);
+            }
+        }
+
         // TODO: use a separate rep:autoCreatePropertyDefinitions
         Tree properties = type.getChild(REP_NAMED_PROPERTY_DEFINITIONS);
         for (Tree definitions : properties.getChildren()) {
@@ -260,8 +271,12 @@ public final class TreeUtil {
             for (Tree definition : definitions.getChildren()) {
                 if (getBoolean(definition, JCR_AUTOCREATED)) {
                     if (!tree.hasProperty(name)) {
-                        PropertyState property =
-                                autoCreateProperty(name, definition, userID);
+                        PropertyState property;
+                        if (propertiesHandler.containsKey(name)) {
+                            property = propertiesHandler.get(name).autoCreateProperty(name, definition, userID);
+                        } else {
+                            property = autoCreateProperty(name, definition, userID);
+                        }
                         if (property != null) {
                             tree.setProperty(property);
                         } else {
@@ -287,7 +302,12 @@ public final class TreeUtil {
                     if (!tree.hasChild(name)) {
                         String typeName =
                                 getName(definition, JCR_DEFAULTPRIMARYTYPE);
-                        addChild(tree, name, typeName, typeRoot, userID);
+
+                        if (nodesHandler.containsKey(name)) {
+                            nodesHandler.get(name).addChild(tree, name, typeName, typeRoot, userID);
+                        } else {
+                            addChild(tree, name, typeName, typeRoot, userID);
+                        }
                     }
                     break;
                 }
@@ -333,8 +353,8 @@ public final class TreeUtil {
     /**
      * Finds the default primary type for a new child node with the given name.
      *
-     * @param typeRoot root of the {@code /jcr:system/jcr:nodeTypes} tree
-     * @param parent parent node
+     * @param typeRoot  root of the {@code /jcr:system/jcr:nodeTypes} tree
+     * @param parent    parent node
      * @param childName name of the new child node
      * @return name of the default type, or {@code null} if not available
      */
